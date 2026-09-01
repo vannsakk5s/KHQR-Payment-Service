@@ -1,3 +1,4 @@
+import uuid
 from fastapi.testclient import TestClient
 import pytest
 from app.main import app
@@ -23,7 +24,7 @@ def test_create_and_mock_pay(monkeypatch):
             "currency": "USD",
             "payment_type": "DEPOSIT",
             "payment_method": "KHQR",
-            "idempotency_key": "booking-2-deposit-v1-mock-test",
+            "idempotency_key": f"booking-2-deposit-{uuid.uuid4().hex}",
         }
 
         created = client.post("/api/v1/payments", json=request, headers=headers)

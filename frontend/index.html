@@ -1,0 +1,1358 @@
+<!doctype html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interactive Testing Dashboard for Hotel Booking Service (:8030) and KHQR Payment Microservice (:8000)">
+  <title>Hotel & KHQR Payment Test Suite</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- QRCode.js & Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+            },
+            khqr: {
+              red: '#E11D48',
+              dark: '#9F1239',
+              light: '#FFE4E6'
+            }
+          },
+          boxShadow: {
+            glow: '0 0 40px -10px rgba(14, 165, 233, 0.3)',
+            khqr: '0 0 35px -5px rgba(225, 29, 72, 0.35)',
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #090d16; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(51, 65, 85, 0.5);
+    }
+    
+    .glass-card {
+      background: rgba(30, 41, 59, 0.5);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(71, 85, 105, 0.4);
+    }
+
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .animate-pulse-subtle { animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  </style>
+</head>
+<body class="min-h-full flex flex-col antialiased selection:bg-brand-500 selection:text-white bg-slate-950 font-sans">
+
+  <!-- Top Navigation Bar -->
+  <header class="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
+      
+      <!-- Brand Logo & Title -->
+      <div class="flex items-center gap-3">
+        <div class="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 via-brand-600 to-indigo-600 font-black text-white shadow-lg shadow-sky-500/25">
+          <span>KH</span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-bold tracking-tight text-white sm:text-lg">Hotel & KHQR Test Suite</h1>
+            <span class="rounded-md border border-brand-500/30 bg-brand-500/10 px-2 py-0.5 text-[11px] font-semibold text-brand-400">Dev v0.1</span>
+          </div>
+          <p class="text-xs text-slate-400">Hotel API (:8030) ↔ KHQR Payment API (:8000)</p>
+        </div>
+      </div>
+
+      <!-- Quick Service Health Badges & Swagger Links -->
+      <div class="flex items-center gap-3">
+        <!-- Service Status Indicators -->
+        <div class="hidden sm:flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-xs">
+          <!-- Hotel Health -->
+          <div class="flex items-center gap-1.5" id="hotelHealthPill" title="Hotel Service Health">
+            <span id="hotelHealthDot" class="h-2.5 w-2.5 rounded-full bg-slate-500"></span>
+            <span class="font-medium text-slate-300">Hotel :8030</span>
+          </div>
+          <span class="text-slate-700">|</span>
+          <!-- Payment Health -->
+          <div class="flex items-center gap-1.5" id="paymentHealthPill" title="Payment Service Health">
+            <span id="paymentHealthDot" class="h-2.5 w-2.5 rounded-full bg-slate-500"></span>
+            <span class="font-medium text-slate-300">Payment :8000</span>
+          </div>
+          <button id="quickPingBtn" class="ml-1 text-slate-400 hover:text-white" title="Check Health Now">
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          </button>
+        </div>
+
+        <!-- Swagger UI Shortcuts -->
+        <div class="flex items-center gap-1.5">
+          <a id="hotelSwaggerLink" href="http://localhost:8030/swagger-ui/index.html#/" target="_blank" rel="noreferrer" class="rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition hover:border-brand-500 hover:text-white flex items-center gap-1">
+            <span>Hotel Docs</span>
+            <svg class="h-3 w-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          </a>
+          <a id="paymentSwaggerLink" href="http://127.0.0.1:8000/docs" target="_blank" rel="noreferrer" class="rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition hover:border-brand-500 hover:text-white flex items-center gap-1">
+            <span>Payment Docs</span>
+            <svg class="h-3 w-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="mx-auto flex max-w-7xl overflow-x-auto px-4 sm:px-6 lg:px-8 border-t border-slate-800/60">
+      <nav class="flex gap-2 py-2" aria-label="Tabs">
+        <button data-tab="wizard" class="tab-btn flex items-center gap-2 rounded-lg bg-brand-500/10 px-3.5 py-1.5 text-xs font-bold text-brand-400 border border-brand-500/30">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          End-to-End Payment Flow
+        </button>
+        <button data-tab="payments" class="tab-btn flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold text-slate-400 hover:text-slate-200 hover:bg-slate-800">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+          Payment API Engine (:8000)
+        </button>
+        <button data-tab="hotel" class="tab-btn flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold text-slate-400 hover:text-slate-200 hover:bg-slate-800">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+          Hotel Bookings (:8030)
+        </button>
+        <button data-tab="customer" class="tab-btn flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold text-slate-400 hover:text-slate-200 hover:bg-slate-800">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+          Guest Checkout View
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Global Alert Notice -->
+  <div class="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
+    <div id="globalAlert" class="hidden rounded-xl border px-4 py-3 text-sm shadow-lg transition-all" role="alert"></div>
+  </div>
+
+  <!-- Global API Config Banner (Collapsible) -->
+  <section class="mx-auto w-full max-w-7xl px-4 pt-3 sm:px-6 lg:px-8">
+    <div class="glass-panel rounded-2xl p-4 shadow-lg">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="flex h-6 w-6 items-center justify-center rounded-md bg-brand-500/20 text-brand-400">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </span>
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Environment & Authentication Config</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="saveConfigBtn" class="rounded-lg bg-brand-500 hover:bg-brand-600 px-3 py-1 text-xs font-bold text-white shadow transition">
+            Save Config
+          </button>
+          <button id="toggleConfigBtn" class="rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 px-2.5 py-1 text-xs text-slate-300">
+            Hide
+          </button>
+        </div>
+      </div>
+
+      <div id="configFields" class="grid gap-3 pt-3 md:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <label class="text-[11px] font-semibold text-slate-400">Hotel API Base URL</label>
+          <input id="hotelUrl" value="http://localhost:8030" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/90 px-3 py-1.5 font-mono text-xs text-slate-200 outline-none focus:border-brand-500">
+        </div>
+        <div>
+          <label class="text-[11px] font-semibold text-slate-400">Payment API Base URL</label>
+          <input id="paymentUrl" value="http://127.0.0.1:8000" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/90 px-3 py-1.5 font-mono text-xs text-slate-200 outline-none focus:border-brand-500">
+        </div>
+        <div>
+          <label class="text-[11px] font-semibold text-slate-400">Payment <code class="text-sky-300">X-Internal-API-Key</code></label>
+          <input id="paymentKey" value="dev-only-change-me" type="text" autocomplete="off" placeholder="Internal API Key" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/90 px-3 py-1.5 font-mono text-xs text-slate-200 outline-none focus:border-brand-500">
+        </div>
+        <div>
+          <label class="text-[11px] font-semibold text-slate-400">Hotel Bearer JWT Token</label>
+          <input id="hotelToken" type="password" autocomplete="off" placeholder="Optional Bearer JWT" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/90 px-3 py-1.5 font-mono text-xs text-slate-200 outline-none focus:border-brand-500">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content Layout -->
+  <main class="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6 lg:px-8 space-y-6">
+
+    <!-- ========================================================================= -->
+    <!-- TAB 1: END-TO-END WIZARD FLOW                                            -->
+    <!-- ========================================================================= -->
+    <div id="tab-wizard" class="tab-content space-y-6">
+      
+      <!-- Stepper Progress Header -->
+      <div class="glass-panel rounded-2xl p-6 shadow-glow">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800 pb-5">
+          <div>
+            <h2 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+              <span>🚀</span> End-to-End Hotel KHQR Payment Workflow
+            </h2>
+            <p class="mt-1 text-sm text-slate-400">
+              Test complete booking reservation → KHQR generation → simulated customer scan & pay → webhook callback verification.
+            </p>
+          </div>
+          <button id="resetWizardBtn" class="self-start md:self-auto rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700">
+            Reset Flow
+          </button>
+        </div>
+
+        <!-- 4 Steps Interactive Tracker -->
+        <div class="grid grid-cols-1 gap-4 pt-6 sm:grid-cols-2 lg:grid-cols-4">
+          <!-- Step 1 Indicator -->
+          <div id="step1-card" class="rounded-xl border-2 border-brand-500/50 bg-brand-500/10 p-4 transition-all">
+            <div class="flex items-center justify-between">
+              <span class="flex h-7 w-7 items-center justify-center rounded-full bg-brand-500 text-xs font-black text-white">1</span>
+              <span id="step1-badge" class="rounded-md bg-brand-500/20 px-2 py-0.5 text-[11px] font-bold text-brand-400">ACTIVE</span>
+            </div>
+            <h3 class="mt-3 text-sm font-bold text-white">Select Booking</h3>
+            <p class="mt-0.5 text-xs text-slate-400">From Hotel Service (:8030)</p>
+          </div>
+
+          <!-- Step 2 Indicator -->
+          <div id="step2-card" class="rounded-xl border border-slate-800 bg-slate-900/50 p-4 opacity-75 transition-all">
+            <div class="flex items-center justify-between">
+              <span class="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-xs font-black text-slate-400">2</span>
+              <span id="step2-badge" class="rounded-md bg-slate-800 px-2 py-0.5 text-[11px] font-bold text-slate-500">PENDING</span>
+            </div>
+            <h3 class="mt-3 text-sm font-bold text-slate-300">Generate KHQR</h3>
+            <p class="mt-0.5 text-xs text-slate-400">Via Payment API (:8000)</p>
+          </div>
+
+          <!-- Step 3 Indicator -->
+          <div id="step3-card" class="rounded-xl border border-slate-800 bg-slate-900/50 p-4 opacity-75 transition-all">
+            <div class="flex items-center justify-between">
+              <span class="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-xs font-black text-slate-400">3</span>
+              <span id="step3-badge" class="rounded-md bg-slate-800 px-2 py-0.5 text-[11px] font-bold text-slate-500">PENDING</span>
+            </div>
+            <h3 class="mt-3 text-sm font-bold text-slate-300">Simulate Payment</h3>
+            <p class="mt-0.5 text-xs text-slate-400">Bakong scan / Mock Paid</p>
+          </div>
+
+          <!-- Step 4 Indicator -->
+          <div id="step4-card" class="rounded-xl border border-slate-800 bg-slate-900/50 p-4 opacity-75 transition-all">
+            <div class="flex items-center justify-between">
+              <span class="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-xs font-black text-slate-400">4</span>
+              <span id="step4-badge" class="rounded-md bg-slate-800 px-2 py-0.5 text-[11px] font-bold text-slate-500">PENDING</span>
+            </div>
+            <h3 class="mt-3 text-sm font-bold text-slate-300">Hotel Confirmed</h3>
+            <p class="mt-0.5 text-xs text-slate-400">Webhook callback verified</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Wizard Step Panels -->
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        
+        <!-- Left 7 Cols: Interactive Controls -->
+        <div class="lg:col-span-7 space-y-6">
+
+          <!-- STEP 1 PANEL: Hotel Booking Selection / Creation -->
+          <div class="glass-panel rounded-2xl p-5">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+              <h3 class="font-bold text-white text-base flex items-center gap-2">
+                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-xs font-black text-white">1</span>
+                Hotel Booking Source
+              </h3>
+              <div class="flex gap-2">
+                <button id="wizLoadBookingsBtn" class="rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200">
+                  ↻ Load from :8030
+                </button>
+              </div>
+            </div>
+
+            <!-- Booking Selection Form / Manual Overrides -->
+            <div class="grid gap-3 sm:grid-cols-3">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-400">Booking ID</label>
+                <input id="wizBookingId" type="number" value="1" min="1" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white font-mono outline-none focus:border-brand-500">
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-400">Customer ID</label>
+                <input id="wizCustomerId" type="number" value="101" min="1" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white font-mono outline-none focus:border-brand-500">
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-400">Deposit Amount</label>
+                <div class="relative mt-1">
+                  <input id="wizAmount" type="number" step="0.01" value="25.00" min="0.01" class="w-full rounded-lg border border-slate-700 bg-slate-900 pl-3 pr-16 py-2 text-sm text-white font-mono font-bold outline-none focus:border-brand-500">
+                  <select id="wizCurrency" class="absolute right-1 top-1 bottom-1 rounded border-0 bg-slate-800 text-xs font-bold text-slate-300 px-2 outline-none">
+                    <option value="USD">USD</option>
+                    <option value="KHR">KHR</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick Booking Selector List (if loaded) -->
+            <div id="wizBookingsPreview" class="mt-4 max-h-48 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/60 p-2 hidden">
+              <div class="text-xs text-slate-400 px-2 py-1 font-semibold">Available Bookings in Hotel Service:</div>
+              <div id="wizBookingsList" class="space-y-1.5 mt-1"></div>
+            </div>
+          </div>
+
+          <!-- STEP 2 PANEL: Create KHQR Payment -->
+          <div class="glass-panel rounded-2xl p-5">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+              <h3 class="font-bold text-white text-base flex items-center gap-2">
+                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-slate-700 text-xs font-black text-white" id="step2-icon">2</span>
+                KHQR Payment Generation
+              </h3>
+              <span class="text-xs text-slate-400">Endpoint: <code class="text-sky-300">POST /api/v1/payments</code></span>
+            </div>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-400">Payment Type</label>
+                <select id="wizPaymentType" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-brand-500">
+                  <option value="DEPOSIT">DEPOSIT (Hotel Booking Deposit)</option>
+                  <option value="FULL_PAYMENT">FULL_PAYMENT</option>
+                  <option value="BALANCE">BALANCE</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-400">Idempotency Key</label>
+                <div class="flex gap-1.5 mt-1">
+                  <input id="wizIdempotencyKey" class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-mono text-slate-300 outline-none focus:border-brand-500">
+                  <button id="wizGenKeyBtn" type="button" class="rounded-lg border border-slate-700 bg-slate-800 px-2.5 text-xs text-slate-300 hover:bg-slate-700" title="Regenerate Key">
+                    🎲
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+              <button id="wizCreatePaymentBtn" class="flex-1 rounded-xl bg-gradient-to-r from-brand-500 to-sky-600 hover:from-brand-600 hover:to-sky-700 py-2.5 px-4 font-bold text-sm text-white shadow-lg shadow-sky-500/20 transition">
+                ⚡ Issue KHQR Payment Code
+              </button>
+            </div>
+          </div>
+
+          <!-- STEP 3 & 4 PANEL: Payment Simulation & Verification -->
+          <div class="glass-panel rounded-2xl p-5">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+              <h3 class="font-bold text-white text-base flex items-center gap-2">
+                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-slate-700 text-xs font-black text-white" id="step3-icon">3</span>
+                Simulate & Verify Payment
+              </h3>
+              <span id="wizStatusBadge" class="rounded-full bg-slate-800 px-3 py-0.5 text-xs font-bold text-slate-400">NO PAYMENT</span>
+            </div>
+
+            <div class="flex flex-wrap gap-2.5">
+              <!-- Mock Paid Button -->
+              <button id="wizMockPayBtn" class="flex-1 min-w-[140px] rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 py-2.5 px-3 font-bold text-xs text-slate-950 shadow transition flex items-center justify-center gap-1.5">
+                <span>🧪</span> Simulate Paid (Mock)
+              </button>
+
+              <!-- Verify Payment Button -->
+              <button id="wizVerifyBtn" class="flex-1 min-w-[130px] rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 px-3 font-bold text-xs text-white shadow transition flex items-center justify-center gap-1.5">
+                <span>🔍</span> Check & Verify
+              </button>
+
+              <!-- Check Hotel Callback Status -->
+              <button id="wizCheckHotelBtn" class="flex-1 min-w-[150px] rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 py-2.5 px-3 font-bold text-xs text-slate-200 shadow transition flex items-center justify-center gap-1.5">
+                <span>🏨</span> Check Hotel Status
+              </button>
+            </div>
+
+            <!-- Webhook / Callback feedback box -->
+            <div id="wizCallbackBox" class="mt-4 rounded-xl border border-slate-800 bg-slate-950/80 p-3 text-xs space-y-1 hidden">
+              <div class="flex items-center justify-between font-bold">
+                <span class="text-slate-300">Hotel Webhook Notification:</span>
+                <span id="wizCallbackStatus" class="font-mono text-amber-400">PENDING</span>
+              </div>
+              <p id="wizCallbackMsg" class="text-slate-400 text-[11px]">Awaiting payment verification...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right 5 Cols: Visual KHQR Stand & Live Ticket Card -->
+        <div class="lg:col-span-5 space-y-6">
+          
+          <!-- KHQR Card Display -->
+          <div class="relative overflow-hidden rounded-3xl border border-slate-700 bg-slate-900/90 p-6 shadow-khqr">
+            <!-- Decorative KHQR Top Strip -->
+            <div class="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-khqr-red/20 blur-2xl"></div>
+
+            <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div class="flex items-center gap-2">
+                <span class="font-black text-xl tracking-tighter text-khqr-red">KHQR</span>
+                <span class="text-xs font-semibold text-slate-400">National QR Standard</span>
+              </div>
+              <span id="qrStatusTag" class="rounded-full bg-slate-800 px-3 py-1 text-xs font-bold text-slate-400">IDLE</span>
+            </div>
+
+            <!-- QR Code Box -->
+            <div class="my-5 flex flex-col items-center justify-center">
+              <div id="wizEmptyQrPlaceholder" class="grid h-60 w-60 place-items-center rounded-2xl border-2 border-dashed border-slate-700 text-center p-4">
+                <div>
+                  <svg class="mx-auto h-12 w-12 text-slate-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                  <p class="text-xs font-medium text-slate-400">Click "Issue KHQR Payment Code" to generate QR</p>
+                </div>
+              </div>
+
+              <div id="wizQrWrapper" class="hidden flex flex-col items-center">
+                <!-- White QR Border Box mimicking real Bakong QR stand -->
+                <div class="rounded-2xl bg-white p-4 shadow-2xl border-4 border-khqr-red relative">
+                  <div class="text-center font-black text-sm text-khqr-red pb-1 tracking-wider border-b border-rose-100 mb-2">KHQR</div>
+                  <div id="wizQrContainer" class="flex items-center justify-center"></div>
+                  <div class="text-center font-mono text-[10px] text-slate-400 pt-1">BAKONG KHQR</div>
+                </div>
+
+                <!-- Expiry Countdown -->
+                <div id="wizTimerText" class="mt-3 text-xs font-bold text-amber-400 flex items-center gap-1">
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span>Expires in: <strong id="wizCountdown">10:00</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Amount & Details Summary -->
+            <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-4 space-y-2 text-xs">
+              <div class="flex items-center justify-between text-slate-400">
+                <span>Payment Amount</span>
+                <span id="wizDisplayAmount" class="font-bold text-base text-white">—</span>
+              </div>
+              <div class="flex items-center justify-between text-slate-400">
+                <span>Payment ID</span>
+                <span id="wizDisplayPaymentId" class="font-mono text-slate-300 text-[11px] truncate max-w-[180px]">—</span>
+              </div>
+              <div class="flex items-center justify-between text-slate-400">
+                <span>Merchant Reference</span>
+                <span id="wizDisplayMerchantRef" class="font-mono text-slate-300 text-[11px] truncate max-w-[180px]">—</span>
+              </div>
+              <div class="flex items-center justify-between text-slate-400">
+                <span>Hotel Callback Status</span>
+                <span id="wizDisplayCallback" class="font-bold text-slate-300">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 2: PAYMENT API ENGINE DIRECT TESTER (:8000)                           -->
+    <!-- ========================================================================= -->
+    <div id="tab-payments" class="tab-content hidden space-y-6">
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        
+        <!-- Left Form (7 cols) -->
+        <div class="lg:col-span-7 space-y-6">
+          <div class="glass-panel rounded-2xl p-6">
+            <h2 class="text-lg font-bold text-white mb-1">Create KHQR Payment</h2>
+            <p class="text-xs text-slate-400 mb-5">Endpoint: <code class="text-sky-300">POST /api/v1/payments</code></p>
+
+            <form id="directPaymentForm" class="space-y-4">
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label class="text-xs font-semibold text-slate-300">Booking ID <span class="text-rose-400">*</span></label>
+                  <input id="dirBookingId" type="number" min="1" value="2" required class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-brand-500 font-mono">
+                </div>
+                <div>
+                  <label class="text-xs font-semibold text-slate-300">Customer ID <span class="text-rose-400">*</span></label>
+                  <input id="dirCustomerId" type="number" min="1" value="6" required class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-brand-500 font-mono">
+                </div>
+                <div>
+                  <label class="text-xs font-semibold text-slate-300">Amount <span class="text-rose-400">*</span></label>
+                  <input id="dirAmount" type="number" step="0.01" min="0.01" value="30.00" required class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-brand-500 font-mono font-bold">
+                </div>
+                <div>
+                  <label class="text-xs font-semibold text-slate-300">Currency</label>
+                  <select id="dirCurrency" class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-brand-500">
+                    <option value="USD">USD</option>
+                    <option value="KHR">KHR</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-xs font-semibold text-slate-300">Payment Type</label>
+                  <select id="dirPaymentType" class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-brand-500">
+                    <option value="DEPOSIT">DEPOSIT</option>
+                    <option value="FULL_PAYMENT">FULL_PAYMENT</option>
+                    <option value="BALANCE">BALANCE</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-xs font-semibold text-slate-300">Idempotency Key</label>
+                  <input id="dirIdempotencyKey" required minlength="8" class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white font-mono outline-none focus:border-brand-500">
+                </div>
+              </div>
+
+              <div class="flex flex-wrap gap-2.5 pt-2">
+                <button type="submit" id="dirSubmitBtn" class="flex-1 rounded-xl bg-brand-500 hover:bg-brand-600 py-2.5 px-4 font-bold text-sm text-white shadow-lg transition">
+                  Create Payment Code
+                </button>
+                <button type="button" id="dirGenKeyBtn" class="rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 px-3 py-2.5 text-xs text-slate-300">
+                  New Key
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Lookup Panels -->
+          <div class="glass-panel rounded-2xl p-6">
+            <h3 class="text-sm font-bold text-white mb-3">Lookup & Query Endpoints</h3>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div class="space-y-2">
+                <label class="text-xs text-slate-400 font-medium">Lookup by Payment ID</label>
+                <div class="flex gap-2">
+                  <input id="queryPaymentId" placeholder="UUID or ID" class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-mono text-white outline-none focus:border-brand-500">
+                  <button id="queryPaymentBtn" class="rounded-lg bg-slate-800 hover:bg-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200">GET</button>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <label class="text-xs text-slate-400 font-medium">Lookup by Booking ID</label>
+                <div class="flex gap-2">
+                  <input id="queryBookingId" type="number" placeholder="Booking ID e.g. 2" class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-mono text-white outline-none focus:border-brand-500">
+                  <button id="queryBookingBtn" class="rounded-lg bg-slate-800 hover:bg-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200">GET</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Visual (5 cols) -->
+        <div class="lg:col-span-5 space-y-6">
+          <div class="glass-panel rounded-2xl p-6">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 class="font-bold text-white text-base">Payment Result</h3>
+              <span id="dirPaymentBadge" class="rounded-full bg-slate-800 px-3 py-0.5 text-xs font-bold text-slate-400">NONE</span>
+            </div>
+
+            <div id="dirEmptyQr" class="my-8 text-center text-slate-500 text-sm py-12 border border-dashed border-slate-800 rounded-2xl">
+              Submit payment form to render KHQR.
+            </div>
+
+            <div id="dirQrPanel" class="hidden my-4 text-center">
+              <div class="inline-block rounded-2xl bg-white p-3 shadow-xl">
+                <div id="dirQrCode"></div>
+              </div>
+              <div id="dirQrAmount" class="mt-3 text-xl font-extrabold text-white"></div>
+              <div id="dirPaymentIdText" class="mt-1 font-mono text-[11px] text-slate-400 break-all"></div>
+
+              <div class="mt-5 grid grid-cols-3 gap-2">
+                <button id="dirGetStatusBtn" class="rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 px-2 py-2 text-xs font-bold text-slate-200">
+                  Get Status
+                </button>
+                <button id="dirVerifyBtn" class="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-2 py-2 text-xs font-bold text-white">
+                  Verify
+                </button>
+                <button id="dirMockPaidBtn" class="rounded-lg bg-amber-500 hover:bg-amber-400 px-2 py-2 text-xs font-bold text-slate-950">
+                  Mock Paid
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 3: HOTEL BOOKINGS EXPLORER (:8030)                                    -->
+    <!-- ========================================================================= -->
+    <div id="tab-hotel" class="tab-content hidden space-y-6">
+      <div class="glass-panel rounded-2xl p-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4 mb-4">
+          <div>
+            <h2 class="text-lg font-bold text-white">Hotel Service (:8030) Bookings</h2>
+            <p class="text-xs text-slate-400">Manage and inspect real-time bookings from the Spring Boot backend.</p>
+          </div>
+          <div class="flex gap-2">
+            <button id="hotelFetchBookingsBtn" class="rounded-xl bg-brand-500 hover:bg-brand-600 px-4 py-2 text-xs font-bold text-white shadow">
+              Fetch Bookings (GET /api/v1/bookings)
+            </button>
+          </div>
+        </div>
+
+        <!-- Bookings Table -->
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
+          <table class="min-w-full divide-y divide-slate-800 text-left text-sm">
+            <thead class="bg-slate-900/80 text-xs font-bold uppercase tracking-wider text-slate-400">
+              <tr>
+                <th class="px-4 py-3">Booking ID</th>
+                <th class="px-4 py-3">Customer</th>
+                <th class="px-4 py-3">Hotel / Room</th>
+                <th class="px-4 py-3">Check-in / Out</th>
+                <th class="px-4 py-3">Total</th>
+                <th class="px-4 py-3">Deposit Due</th>
+                <th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="hotelBookingsTableBody" class="divide-y divide-slate-800 text-xs">
+              <tr>
+                <td colspan="8" class="px-4 py-12 text-center text-slate-500">
+                  Click "Fetch Bookings" to load bookings from Hotel Service at :8030.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 4: GUEST CHECKOUT SIMULATOR                                          -->
+    <!-- ========================================================================= -->
+    <div id="tab-customer" class="tab-content hidden space-y-6">
+      <div class="mx-auto max-w-2xl">
+        <div class="glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-700">
+          
+          <div class="text-center pb-6 border-b border-slate-800">
+            <div class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-brand-500 to-indigo-600 text-white font-black text-xl mb-3 shadow-lg">
+              H
+            </div>
+            <h2 class="text-xl font-bold text-white">Grand Hotel & Suites</h2>
+            <p class="text-xs text-slate-400">Official Guest Reservation & Deposit Portal</p>
+          </div>
+
+          <div class="mt-6 space-y-4">
+            <div class="flex items-center justify-between text-xs text-slate-400 bg-slate-900/60 p-3 rounded-xl">
+              <span>Booking Ref:</span>
+              <span id="custBookingRefText" class="font-mono font-bold text-slate-200">#1024</span>
+            </div>
+
+            <!-- Summary Breakdown -->
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 space-y-2 text-xs">
+              <div class="flex justify-between text-slate-400">
+                <span>Room Type</span>
+                <span class="text-slate-200 font-medium">Deluxe King Suite</span>
+              </div>
+              <div class="flex justify-between text-slate-400">
+                <span>Stay Duration</span>
+                <span class="text-slate-200 font-medium">3 Nights (2 Guests)</span>
+              </div>
+              <div class="flex justify-between text-slate-400 border-t border-slate-800/80 pt-2 font-bold text-sm">
+                <span class="text-white">Deposit Due Today</span>
+                <span id="custAmountText" class="text-brand-400 font-mono">$30.00 USD</span>
+              </div>
+            </div>
+
+            <!-- Customer QR Stand -->
+            <div class="rounded-2xl border-2 border-slate-800 bg-slate-950 p-6 text-center space-y-4">
+              <div class="text-khqr-red font-black text-2xl tracking-tighter">KHQR</div>
+              <div class="inline-block rounded-2xl bg-white p-3 shadow-xl">
+                <div id="custQrCode"></div>
+              </div>
+              <p class="text-xs text-slate-400 max-w-sm mx-auto">
+                Scan with Bakong, ABA Mobile, ACLEDA, or any KHQR enabled banking application.
+              </p>
+              
+              <div class="pt-2 flex justify-center gap-2">
+                <button id="custSimulatePayBtn" class="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg transition">
+                  📱 Simulate Banking App Scan & Pay
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- LIVE RESPONSE INSPECTOR & LOG TERMINAL                                    -->
+    <!-- ========================================================================= -->
+    <section class="glass-panel rounded-2xl p-5 shadow-lg">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Live API Inspector & Console Output</h3>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="copyCurlBtn" class="rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 px-2.5 py-1 text-xs text-slate-300 font-mono">
+            Copy cURL
+          </button>
+          <button id="copyJsonBtn" class="rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 px-2.5 py-1 text-xs text-slate-300">
+            Copy JSON
+          </button>
+          <button id="clearLogBtn" class="rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200">
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Terminal Body -->
+      <div class="mt-3 grid gap-3 lg:grid-cols-12">
+        <div class="lg:col-span-4 rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs space-y-2">
+          <div class="text-[11px] font-bold text-slate-400 uppercase">Last Request Info</div>
+          <div class="font-mono text-slate-300 space-y-1">
+            <div><span class="text-slate-500">Method:</span> <strong id="logMethod" class="text-brand-400">GET</strong></div>
+            <div class="break-all"><span class="text-slate-500">URL:</span> <span id="logUrl" class="text-slate-300">http://127.0.0.1:8000/health</span></div>
+            <div><span class="text-slate-500">Status:</span> <span id="logStatus" class="font-bold text-emerald-400">200 OK</span></div>
+            <div><span class="text-slate-500">Latency:</span> <span id="logLatency" class="text-slate-400">12ms</span></div>
+          </div>
+        </div>
+
+        <div class="lg:col-span-8">
+          <pre id="jsonLog" class="max-h-72 min-h-36 overflow-auto rounded-xl bg-slate-950 p-4 font-mono text-xs leading-5 text-emerald-300 select-all border border-slate-800/80">Ready. Test a service to inspect response.</pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="mt-auto border-t border-slate-800 bg-slate-950 py-4 text-center text-xs text-slate-500">
+    KHQR Payment Microservice Test Environment &bull; Built with HTML5, Vanilla JavaScript & Tailwind CSS
+  </footer>
+
+  <!-- ========================================================================= -->
+  <!-- APPLICATION SCRIPT LOGIC                                                  -->
+  <!-- ========================================================================= -->
+  <script>
+    "use strict";
+
+    // Helper shorthand
+    const $ = (id) => document.getElementById(id);
+    
+    // State Store
+    const state = {
+      activeTab: 'wizard',
+      hotelBookings: [],
+      currentPayment: null,
+      countdownTimer: null,
+      pollTimer: null,
+      lastRequest: { method: 'GET', url: '', headers: {}, body: null, response: null }
+    };
+
+    // Configuration retrieval
+    function getConfig() {
+      return {
+        hotelUrl: ($("hotelUrl").value || "http://localhost:8030").trim().replace(/\/$/, ""),
+        paymentUrl: ($("paymentUrl").value || "http://127.0.0.1:8000").trim().replace(/\/$/, ""),
+        paymentKey: ($("paymentKey").value || "dev-only-change-me").trim(),
+        hotelToken: ($("hotelToken").value || "").trim().replace(/^Bearer\s+/i, ""),
+      };
+    }
+
+    function saveConfig(notify = true) {
+      const cfg = getConfig();
+      localStorage.setItem("hotel_khqr_test_config", JSON.stringify(cfg));
+      if (notify) showAlert("Environment configuration saved.", "success");
+    }
+
+    function restoreConfig() {
+      try {
+        const saved = JSON.parse(localStorage.getItem("hotel_khqr_test_config") || "null");
+        if (saved) {
+          if (saved.hotelUrl) $("hotelUrl").value = saved.hotelUrl;
+          if (saved.paymentUrl) $("paymentUrl").value = saved.paymentUrl;
+          if (saved.paymentKey) $("paymentKey").value = saved.paymentKey;
+          if (saved.hotelToken) $("hotelToken").value = saved.hotelToken;
+        }
+      } catch (_) {}
+    }
+
+    function showAlert(message, type = "error") {
+      const el = $("globalAlert");
+      el.textContent = message;
+      el.className = `rounded-xl border px-4 py-3 text-sm shadow-lg transition-all ${
+        type === "success"
+          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+          : type === "info"
+          ? "border-sky-500/40 bg-sky-500/10 text-sky-300"
+          : "border-rose-500/40 bg-rose-500/10 text-rose-300"
+      }`;
+      el.classList.remove("hidden");
+      window.clearTimeout(showAlert.timer);
+      showAlert.timer = window.setTimeout(() => el.classList.add("hidden"), 6000);
+    }
+
+    // Generic HTTP Request Handler with Logging
+    async function apiRequest(url, options = {}) {
+      const method = options.method || "GET";
+      const start = performance.now();
+      state.lastRequest = { method, url, headers: options.headers || {}, body: options.body };
+
+      try {
+        const res = await fetch(url, options);
+        const latency = Math.round(performance.now() - start);
+        const text = await res.text();
+        let json;
+        try { json = text ? JSON.parse(text) : null; } catch (_) { json = text; }
+
+        state.lastRequest.response = json;
+        updateInspector(method, url, res.status, res.statusText, latency, json);
+
+        if (!res.ok) {
+          const detail = typeof json === "object" ? json?.detail || json?.message : json;
+          throw new Error(detail || `HTTP ${res.status}: ${res.statusText}`);
+        }
+        return json;
+      } catch (err) {
+        const latency = Math.round(performance.now() - start);
+        updateInspector(method, url, 0, "Network Error", latency, { error: err.message });
+        throw err;
+      }
+    }
+
+    function updateInspector(method, url, status, statusText, latency, data) {
+      $("logMethod").textContent = method;
+      $("logUrl").textContent = url;
+      $("logStatus").textContent = status ? `${status} ${statusText}` : "Failed";
+      $("logStatus").className = (status >= 200 && status < 300) 
+        ? "font-bold text-emerald-400" 
+        : "font-bold text-rose-400";
+      $("logLatency").textContent = `${latency}ms`;
+      $("jsonLog").textContent = JSON.stringify(data, null, 2);
+    }
+
+    // Auth Header Builders
+    function paymentHeaders(json = false) {
+      const headers = { "X-Internal-API-Key": getConfig().paymentKey };
+      if (json) headers["Content-Type"] = "application/json";
+      return headers;
+    }
+
+    function hotelHeaders(json = false) {
+      const headers = {};
+      const token = getConfig().hotelToken;
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      if (json) headers["Content-Type"] = "application/json";
+      return headers;
+    }
+
+    // Health Checks
+    async function checkHealth() {
+      const cfg = getConfig();
+      // Payment Service Health
+      try {
+        await fetch(`${cfg.paymentUrl}/health`);
+        $("paymentHealthDot").className = "h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50";
+      } catch (_) {
+        $("paymentHealthDot").className = "h-2.5 w-2.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50";
+      }
+
+      // Hotel Service Health
+      try {
+        await fetch(`${cfg.hotelUrl}/api/v1/bookings`, { headers: hotelHeaders() });
+        $("hotelHealthDot").className = "h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50";
+      } catch (_) {
+        $("hotelHealthDot").className = "h-2.5 w-2.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50";
+      }
+    }
+
+    // QR Code Render Helper
+    function renderQr(containerId, text, size = 190) {
+      const container = $(containerId);
+      container.replaceChildren();
+      if (!text) return;
+      if (typeof QRCode === "function") {
+        new QRCode(container, {
+          text: text,
+          width: size,
+          height: size,
+          colorDark: "#0f172a",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      } else {
+        container.textContent = "QR Code generator not ready.";
+      }
+    }
+
+    // Tab Switching Logic
+    function switchTab(tabId) {
+      state.activeTab = tabId;
+      document.querySelectorAll(".tab-btn").forEach(btn => {
+        const isActive = btn.dataset.tab === tabId;
+        btn.className = isActive
+          ? "tab-btn flex items-center gap-2 rounded-lg bg-brand-500/10 px-3.5 py-1.5 text-xs font-bold text-brand-400 border border-brand-500/30"
+          : "tab-btn flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold text-slate-400 hover:text-slate-200 hover:bg-slate-800";
+      });
+
+      document.querySelectorAll(".tab-content").forEach(el => {
+        el.classList.toggle("hidden", el.id !== `tab-${tabId}`);
+      });
+    }
+
+    // =========================================================================
+    // WIZARD FLOW LOGIC
+    // =========================================================================
+    function generateIdempotencyKey(bookingId) {
+      return `HTL-${bookingId || 'test'}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    }
+
+    function resetWizard() {
+      state.currentPayment = null;
+      clearInterval(state.countdownTimer);
+      clearInterval(state.pollTimer);
+
+      $("wizBookingId").value = "1";
+      $("wizCustomerId").value = "101";
+      $("wizAmount").value = "25.00";
+      $("wizIdempotencyKey").value = generateIdempotencyKey(1);
+      
+      $("wizEmptyQrPlaceholder").classList.remove("hidden");
+      $("wizQrWrapper").classList.add("hidden");
+      $("wizDisplayAmount").textContent = "—";
+      $("wizDisplayPaymentId").textContent = "—";
+      $("wizDisplayMerchantRef").textContent = "—";
+      $("wizDisplayCallback").textContent = "—";
+      $("qrStatusTag").textContent = "IDLE";
+      $("qrStatusTag").className = "rounded-full bg-slate-800 px-3 py-1 text-xs font-bold text-slate-400";
+      $("wizStatusBadge").textContent = "NO PAYMENT";
+      $("wizStatusBadge").className = "rounded-full bg-slate-800 px-3 py-0.5 text-xs font-bold text-slate-400";
+      $("wizCallbackBox").classList.add("hidden");
+
+      // Reset Step Cards
+      updateStepCards(1);
+      showAlert("Wizard reset to initial step.", "info");
+    }
+
+    function updateStepCards(step) {
+      const steps = [
+        { card: $("step1-card"), badge: $("step1-badge"), num: 1 },
+        { card: $("step2-card"), badge: $("step2-badge"), num: 2 },
+        { card: $("step3-card"), badge: $("step3-badge"), num: 3 },
+        { card: $("step4-card"), badge: $("step4-badge"), num: 4 },
+      ];
+
+      steps.forEach(s => {
+        if (s.num < step) {
+          s.card.className = "rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 transition-all";
+          s.badge.className = "rounded-md bg-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-400";
+          s.badge.textContent = "COMPLETED";
+        } else if (s.num === step) {
+          s.card.className = "rounded-xl border-2 border-brand-500 bg-brand-500/10 p-4 shadow-glow transition-all";
+          s.badge.className = "rounded-md bg-brand-500/20 px-2 py-0.5 text-[11px] font-bold text-brand-400";
+          s.badge.textContent = "ACTIVE";
+        } else {
+          s.card.className = "rounded-xl border border-slate-800 bg-slate-900/50 p-4 opacity-70 transition-all";
+          s.badge.className = "rounded-md bg-slate-800 px-2 py-0.5 text-[11px] font-bold text-slate-500";
+          s.badge.textContent = "PENDING";
+        }
+      });
+    }
+
+    async function loadHotelBookingsForWizard() {
+      try {
+        const cfg = getConfig();
+        const data = await apiRequest(`${cfg.hotelUrl}/api/v1/bookings`, { headers: hotelHeaders() });
+        const list = Array.isArray(data) ? data : (data?.content || data?.data || []);
+        state.hotelBookings = list;
+
+        const preview = $("wizBookingsPreview");
+        const container = $("wizBookingsList");
+        container.replaceChildren();
+
+        if (list.length === 0) {
+          container.innerHTML = '<div class="text-slate-500 text-xs py-2 px-2">No bookings found in Hotel Service.</div>';
+        } else {
+          list.forEach(b => {
+            const item = document.createElement("div");
+            item.className = "flex items-center justify-between rounded-lg bg-slate-900 p-2 text-xs border border-slate-800 hover:border-brand-500 cursor-pointer";
+            item.innerHTML = `
+              <div>
+                <span class="font-bold text-sky-400">Booking #${b.id}</span>
+                <span class="text-slate-400 ml-2">Cust #${b.customerId || '—'}</span>
+                <span class="text-slate-300 font-semibold ml-2">$${b.depositAmount || b.totalPrice || 0}</span>
+              </div>
+              <span class="rounded bg-slate-800 px-2 py-0.5 text-[10px] text-amber-300 font-bold">${b.status || 'PENDING'}</span>
+            `;
+            item.onclick = () => {
+              $("wizBookingId").value = b.id;
+              $("wizCustomerId").value = b.customerId || 101;
+              $("wizAmount").value = b.depositAmount || b.totalPrice || "30.00";
+              $("wizCurrency").value = b.currency || "USD";
+              $("wizIdempotencyKey").value = generateIdempotencyKey(b.id);
+              showAlert(`Selected Booking #${b.id} for payment.`, "success");
+            };
+            container.appendChild(item);
+          });
+        }
+        preview.classList.remove("hidden");
+        showAlert(`Loaded ${list.length} booking(s) from Hotel Service.`, "success");
+      } catch (err) {
+        showAlert(`Failed to load bookings: ${err.message}`);
+      }
+    }
+
+    async function wizardCreatePayment() {
+      const cfg = getConfig();
+      const payload = {
+        booking_id: Number($("wizBookingId").value),
+        customer_id: Number($("wizCustomerId").value),
+        amount: Number($("wizAmount").value),
+        currency: $("wizCurrency").value,
+        payment_type: $("wizPaymentType").value,
+        payment_method: "KHQR",
+        idempotency_key: $("wizIdempotencyKey").value.trim() || generateIdempotencyKey($("wizBookingId").value)
+      };
+
+      try {
+        const payment = await apiRequest(`${cfg.paymentUrl}/api/v1/payments`, {
+          method: "POST",
+          headers: paymentHeaders(true),
+          body: JSON.stringify(payload)
+        });
+
+        state.currentPayment = payment;
+        renderWizardPayment(payment);
+        updateStepCards(3);
+        showAlert(`KHQR Payment created with ID: ${payment.id}`, "success");
+      } catch (err) {
+        showAlert(`Create Payment Failed: ${err.message}`);
+      }
+    }
+
+    function renderWizardPayment(payment) {
+      $("wizEmptyQrPlaceholder").classList.add("hidden");
+      $("wizQrWrapper").classList.remove("hidden");
+
+      renderQr("wizQrContainer", payment.qr_payload || "MOCK-KHQR", 190);
+      renderQr("custQrCode", payment.qr_payload || "MOCK-KHQR", 210);
+
+      $("wizDisplayAmount").textContent = `${payment.currency} ${Number(payment.amount).toFixed(2)}`;
+      $("wizDisplayPaymentId").textContent = payment.id;
+      $("wizDisplayMerchantRef").textContent = payment.merchant_reference || "—";
+      $("wizDisplayCallback").textContent = payment.callback_status || "NOT_SENT";
+
+      $("custBookingRefText").textContent = `#${payment.booking_id}`;
+      $("custAmountText").textContent = `${payment.currency} ${Number(payment.amount).toFixed(2)}`;
+
+      const status = payment.status || "PENDING";
+      $("qrStatusTag").textContent = status;
+      $("wizStatusBadge").textContent = status;
+
+      if (status === "PAID") {
+        $("qrStatusTag").className = "rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-400";
+        $("wizStatusBadge").className = "rounded-full bg-emerald-500/20 px-3 py-0.5 text-xs font-bold text-emerald-400";
+      } else {
+        $("qrStatusTag").className = "rounded-full bg-amber-500/20 px-3 py-1 text-xs font-bold text-amber-400";
+        $("wizStatusBadge").className = "rounded-full bg-amber-500/20 px-3 py-0.5 text-xs font-bold text-amber-400";
+      }
+
+      startWizardCountdown(payment.expires_at);
+    }
+
+    function startWizardCountdown(expiresAt) {
+      clearInterval(state.countdownTimer);
+      if (!expiresAt) return;
+
+      const target = new Date(expiresAt).getTime();
+      const update = () => {
+        const remaining = Math.max(0, target - Date.now());
+        const mins = Math.floor(remaining / 60000);
+        const secs = Math.floor((remaining % 60000) / 1000);
+        $("wizCountdown").textContent = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+        if (!remaining) {
+          clearInterval(state.countdownTimer);
+          $("wizCountdown").textContent = "EXPIRED";
+        }
+      };
+      update();
+      state.countdownTimer = setInterval(update, 1000);
+    }
+
+    async function wizardSimulateMockPaid() {
+      if (!state.currentPayment?.id) {
+        return showAlert("Please create a payment first (Step 2).");
+      }
+      const cfg = getConfig();
+      try {
+        const res = await apiRequest(`${cfg.paymentUrl}/api/v1/payments/${state.currentPayment.id}/mock-paid`, {
+          method: "POST",
+          headers: paymentHeaders()
+        });
+
+        const payment = res.payment || res;
+        state.currentPayment = payment;
+        renderWizardPayment(payment);
+
+        if (payment.status === "PAID") {
+          updateStepCards(4);
+          triggerConfetti();
+          
+          $("wizCallbackBox").classList.remove("hidden");
+          $("wizCallbackStatus").textContent = res.hotel_notified ? "SENT & CONFIRMED" : "FAILED_OR_NO_HOTEL_URL";
+          $("wizCallbackStatus").className = res.hotel_notified ? "font-mono text-emerald-400" : "font-mono text-amber-400";
+          $("wizCallbackMsg").textContent = res.hotel_notified 
+            ? `Hotel server (:8030) was successfully notified for booking #${payment.booking_id}!` 
+            : `Payment is PAID. Note: Set HOTEL_API_BASE_URL in Payment .env to auto-notify Hotel server.`;
+
+          showAlert("Payment successfully confirmed as PAID! Webhook triggered.", "success");
+        }
+      } catch (err) {
+        showAlert(`Mock Pay Failed: ${err.message}`);
+      }
+    }
+
+    async function wizardVerifyPayment() {
+      if (!state.currentPayment?.id) {
+        return showAlert("Please create a payment first.");
+      }
+      const cfg = getConfig();
+      try {
+        const res = await apiRequest(`${cfg.paymentUrl}/api/v1/payments/${state.currentPayment.id}/verify`, {
+          method: "POST",
+          headers: paymentHeaders()
+        });
+        const payment = res.payment || res;
+        state.currentPayment = payment;
+        renderWizardPayment(payment);
+        showAlert(`Payment status is: ${payment.status}`, "success");
+      } catch (err) {
+        showAlert(`Verify Failed: ${err.message}`);
+      }
+    }
+
+    async function wizardCheckHotelStatus() {
+      const bookingId = $("wizBookingId").value;
+      const cfg = getConfig();
+      try {
+        const res = await apiRequest(`${cfg.hotelUrl}/api/v1/bookings/${bookingId}`, {
+          headers: hotelHeaders()
+        });
+        showAlert(`Hotel Booking #${bookingId} Status: ${res.status || 'CONFIRMED'}`, "success");
+      } catch (err) {
+        showAlert(`Could not query Hotel booking: ${err.message}`);
+      }
+    }
+
+    function triggerConfetti() {
+      if (typeof confetti === "function") {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      }
+    }
+
+    // =========================================================================
+    // DIRECT PAYMENT ENGINE LOGIC (TAB 2)
+    // =========================================================================
+    async function handleDirectPaymentSubmit(e) {
+      e.preventDefault();
+      const cfg = getConfig();
+      const payload = {
+        booking_id: Number($("dirBookingId").value),
+        customer_id: Number($("dirCustomerId").value),
+        amount: Number($("dirAmount").value),
+        currency: $("dirCurrency").value,
+        payment_type: $("dirPaymentType").value,
+        payment_method: "KHQR",
+        idempotency_key: $("dirIdempotencyKey").value.trim()
+      };
+
+      try {
+        const payment = await apiRequest(`${cfg.paymentUrl}/api/v1/payments`, {
+          method: "POST",
+          headers: paymentHeaders(true),
+          body: JSON.stringify(payload)
+        });
+
+        renderDirectPayment(payment);
+        showAlert("Direct Payment Created!", "success");
+      } catch (err) {
+        showAlert(`Payment Creation Error: ${err.message}`);
+      }
+    }
+
+    function renderDirectPayment(payment) {
+      state.currentPayment = payment;
+      $("dirEmptyQr").classList.add("hidden");
+      $("dirQrPanel").classList.remove("hidden");
+
+      renderQr("dirQrCode", payment.qr_payload || "MOCK-KHQR", 190);
+      $("dirQrAmount").textContent = `${payment.currency} ${Number(payment.amount).toFixed(2)}`;
+      $("dirPaymentIdText").textContent = `ID: ${payment.id}`;
+
+      const badge = $("dirPaymentBadge");
+      badge.textContent = payment.status;
+      badge.className = payment.status === "PAID" 
+        ? "rounded-full bg-emerald-500/20 px-3 py-0.5 text-xs font-bold text-emerald-400"
+        : "rounded-full bg-amber-500/20 px-3 py-0.5 text-xs font-bold text-amber-400";
+    }
+
+    async function queryPaymentById() {
+      const id = $("queryPaymentId").value.trim();
+      if (!id) return showAlert("Please enter a Payment ID.");
+      const cfg = getConfig();
+      try {
+        const payment = await apiRequest(`${cfg.paymentUrl}/api/v1/payments/${id}`, {
+          headers: paymentHeaders()
+        });
+        renderDirectPayment(payment);
+        showAlert("Payment record found.", "success");
+      } catch (err) {
+        showAlert(`Lookup failed: ${err.message}`);
+      }
+    }
+
+    async function queryPaymentsByBooking() {
+      const id = $("queryBookingId").value.trim();
+      if (!id) return showAlert("Please enter a Booking ID.");
+      const cfg = getConfig();
+      try {
+        const list = await apiRequest(`${cfg.paymentUrl}/api/v1/payments/booking/${id}`, {
+          headers: paymentHeaders()
+        });
+        if (Array.isArray(list) && list.length > 0) {
+          renderDirectPayment(list[0]);
+          showAlert(`Found ${list.length} payment(s) for booking #${id}.`, "success");
+        } else {
+          showAlert(`No payments found for booking #${id}.`, "info");
+        }
+      } catch (err) {
+        showAlert(`Booking lookup failed: ${err.message}`);
+      }
+    }
+
+    // =========================================================================
+    // HOTEL TAB LOGIC (TAB 3)
+    // =========================================================================
+    async function loadHotelBookingsTable() {
+      const cfg = getConfig();
+      const tbody = $("hotelBookingsTableBody");
+      try {
+        const data = await apiRequest(`${cfg.hotelUrl}/api/v1/bookings`, { headers: hotelHeaders() });
+        const list = Array.isArray(data) ? data : (data?.content || data?.data || []);
+        
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-500">No bookings returned from Hotel backend.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = list.map(b => `
+          <tr class="hover:bg-slate-900/60 transition">
+            <td class="px-4 py-3 font-mono font-bold text-sky-400">#${b.id}</td>
+            <td class="px-4 py-3 text-slate-300">Customer #${b.customerId || '—'}</td>
+            <td class="px-4 py-3 text-slate-300">Hotel #${b.hotelId || '1'} &bull; Room #${b.roomTypeId || '1'}</td>
+            <td class="px-4 py-3 text-slate-400">${b.checkInDate || '—'} &rarr; ${b.checkOutDate || '—'}</td>
+            <td class="px-4 py-3 font-bold text-slate-200">${b.currency || 'USD'} ${Number(b.totalPrice || 0).toFixed(2)}</td>
+            <td class="px-4 py-3 font-bold text-emerald-400">${b.currency || 'USD'} ${Number(b.depositAmount || 0).toFixed(2)}</td>
+            <td class="px-4 py-3">
+              <span class="rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                b.status === "CONFIRMED" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" : "bg-amber-500/10 text-amber-300 border border-amber-500/30"
+              }">${b.status || 'PENDING'}</span>
+            </td>
+            <td class="px-4 py-3 text-right">
+              <button onclick="selectBookingForPayment(${b.id}, ${b.customerId || 101}, ${b.depositAmount || b.totalPrice || 25}, '${b.currency || 'USD'}')" class="rounded-lg bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/40 px-2.5 py-1 text-[11px] font-bold text-brand-300 transition">
+                Pay KHQR &rarr;
+              </button>
+            </td>
+          </tr>
+        `).join("");
+
+        showAlert(`Loaded ${list.length} booking(s).`, "success");
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-rose-400">Error loading bookings: ${err.message}</td></tr>`;
+        showAlert(`Hotel bookings load failed: ${err.message}`);
+      }
+    }
+
+    window.selectBookingForPayment = function(id, custId, deposit, currency) {
+      $("wizBookingId").value = id;
+      $("wizCustomerId").value = custId;
+      $("wizAmount").value = deposit;
+      $("wizCurrency").value = currency || "USD";
+      $("wizIdempotencyKey").value = generateIdempotencyKey(id);
+      switchTab("wizard");
+      showAlert(`Selected Booking #${id}. Click "Issue KHQR Payment Code" to proceed.`, "success");
+    };
+
+    // =========================================================================
+    // INITIALIZATION & EVENT BINDINGS
+    // =========================================================================
+    window.addEventListener("DOMContentLoaded", () => {
+      restoreConfig();
+      $("wizIdempotencyKey").value = generateIdempotencyKey(1);
+      $("dirIdempotencyKey").value = generateIdempotencyKey(2);
+
+      // Tab Buttons
+      document.querySelectorAll(".tab-btn").forEach(btn => {
+        btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+      });
+
+      // Config Buttons
+      $("saveConfigBtn").addEventListener("click", () => saveConfig(true));
+      $("toggleConfigBtn").addEventListener("click", () => {
+        const fields = $("configFields");
+        fields.classList.toggle("hidden");
+        $("toggleConfigBtn").textContent = fields.classList.contains("hidden") ? "Show" : "Hide";
+      });
+      $("quickPingBtn").addEventListener("click", () => {
+        checkHealth();
+        showAlert("Pinging Hotel & Payment services...", "info");
+      });
+
+      // Wizard Buttons
+      $("resetWizardBtn").addEventListener("click", resetWizard);
+      $("wizLoadBookingsBtn").addEventListener("click", loadHotelBookingsForWizard);
+      $("wizGenKeyBtn").addEventListener("click", () => {
+        $("wizIdempotencyKey").value = generateIdempotencyKey($("wizBookingId").value);
+      });
+      $("wizCreatePaymentBtn").addEventListener("click", wizardCreatePayment);
+      $("wizMockPayBtn").addEventListener("click", wizardSimulateMockPaid);
+      $("wizVerifyBtn").addEventListener("click", wizardVerifyPayment);
+      $("wizCheckHotelBtn").addEventListener("click", wizardCheckHotelStatus);
+
+      // Direct Payment Tab
+      $("directPaymentForm").addEventListener("submit", handleDirectPaymentSubmit);
+      $("dirGenKeyBtn").addEventListener("click", () => {
+        $("dirIdempotencyKey").value = generateIdempotencyKey($("dirBookingId").value);
+      });
+      $("queryPaymentBtn").addEventListener("click", queryPaymentById);
+      $("queryBookingBtn").addEventListener("click", queryPaymentsByBooking);
+      $("dirGetStatusBtn").addEventListener("click", wizardVerifyPayment);
+      $("dirVerifyBtn").addEventListener("click", wizardVerifyPayment);
+      $("dirMockPaidBtn").addEventListener("click", wizardSimulateMockPaid);
+
+      // Hotel Tab
+      $("hotelFetchBookingsBtn").addEventListener("click", loadHotelBookingsTable);
+
+      // Customer Tab Simulation
+      $("custSimulatePayBtn").addEventListener("click", wizardSimulateMockPaid);
+
+      // Inspector Copy Buttons
+      $("copyCurlBtn").addEventListener("click", () => {
+        const req = state.lastRequest;
+        let cmd = `curl -X ${req.method} "${req.url}"`;
+        Object.entries(req.headers).forEach(([k, v]) => { cmd += ` -H "${k}: ${v}"`; });
+        if (req.body) cmd += ` -d '${req.body}'`;
+        navigator.clipboard.writeText(cmd);
+        showAlert("cURL command copied to clipboard!", "success");
+      });
+
+      $("copyJsonBtn").addEventListener("click", () => {
+        if (state.lastRequest.response) {
+          navigator.clipboard.writeText(JSON.stringify(state.lastRequest.response, null, 2));
+          showAlert("JSON response copied to clipboard!", "success");
+        }
+      });
+
+      $("clearLogBtn").addEventListener("click", () => {
+        $("jsonLog").textContent = "Console cleared.";
+      });
+
+      // Perform initial health check
+      checkHealth();
+    });
+  </script>
+</body>
+</html>
